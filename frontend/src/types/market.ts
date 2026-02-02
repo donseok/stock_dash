@@ -70,6 +70,24 @@ export interface NewsArticle {
   category: string;
 }
 
+export interface StockDetail {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  volume: number;
+  high: number;
+  low: number;
+  open: number;
+  prevClose: number;
+  week52High: number;
+  week52Low: number;
+  marketCap?: number;
+  market: "KR" | "US";
+  timestamp: string;
+}
+
 export interface OHLCData {
   time: string;
   open: number;

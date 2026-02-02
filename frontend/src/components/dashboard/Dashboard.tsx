@@ -9,6 +9,7 @@ import { DomesticStockWidget } from "@/components/widgets/DomesticStockWidget";
 import { ForeignStockWidget } from "@/components/widgets/ForeignStockWidget";
 import { NewsWidget } from "@/components/widgets/NewsWidget";
 import { StockChartWidget } from "@/components/charts/StockChartWidget";
+import { StockDetailPanel } from "@/components/widgets/StockDetailPanel";
 
 export function Dashboard() {
   return (
@@ -29,11 +30,16 @@ export function Dashboard() {
             <PreciousMetalWidget />
           </div>
 
+          {/* Stock detail panel */}
+          <div className="lg:col-span-4">
+            <StockDetailPanel />
+          </div>
+
           {/* Stock widgets row */}
-          <div className="lg:col-span-6">
+          <div className="lg:col-span-4">
             <DomesticStockWidget />
           </div>
-          <div className="lg:col-span-6">
+          <div className="lg:col-span-4">
             <ForeignStockWidget />
           </div>
 

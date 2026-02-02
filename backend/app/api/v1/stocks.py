@@ -6,6 +6,7 @@ from app.connectors.stock import (
     fetch_domestic_stocks,
     fetch_foreign_stocks,
     fetch_stock_chart,
+    fetch_stock_detail,
 )
 from app.utils.time import utcnow_iso
 
@@ -29,6 +30,24 @@ async def get_foreign_stocks():
     stocks = await fetch_foreign_stocks()
     return {
         "data": [s.model_dump() for s in stocks],
+        "status": "success",
+        "timestamp": utcnow_iso(),
+    }
+
+
+@router.get("/{symbol}/detail")
+async def get_stock_detail(symbol: str):
+    """Get detailed stock information including 52-week high/low."""
+    detail = await fetch_stock_detail(symbol)
+    if detail is None:
+        return {
+            "data": None,
+            "status": "error",
+            "message": "Stock not found or data unavailable",
+            "timestamp": utcnow_iso(),
+        }
+    return {
+        "data": detail.model_dump(),
         "status": "success",
         "timestamp": utcnow_iso(),
     }

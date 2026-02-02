@@ -58,4 +58,9 @@ export const marketApi = {
     fetchApi<{ data: import("@/types/market").OHLCData[] }>(
       `/api/v1/stocks/${symbol}/chart?period=${period}`
     ),
+
+  getStockDetail: (symbol: string) =>
+    fetchApi<{ data: import("@/types/market").StockDetail }>(
+      `/api/v1/stocks/${symbol}/detail`
+    ),
 };

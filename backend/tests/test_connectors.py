@@ -5,7 +5,7 @@ from app.connectors.upbit import fetch_crypto_quotes, CRYPTO_MARKETS
 from app.connectors.metals import fetch_precious_metals
 from app.connectors.exchange_rate import fetch_exchange_rates
 from app.connectors.market_index import fetch_market_indices
-from app.connectors.stock import fetch_domestic_stocks, fetch_foreign_stocks, fetch_stock_chart
+from app.connectors.stock import fetch_domestic_stocks, fetch_foreign_stocks, fetch_stock_chart, fetch_stock_detail
 from app.connectors.news import fetch_news
 
 
@@ -64,6 +64,17 @@ async def test_foreign_stock_connector():
     assert isinstance(stocks, list)
     for s in stocks:
         assert s.market == "US"
+
+
+@pytest.mark.anyio
+async def test_stock_detail_connector():
+    detail = await fetch_stock_detail("058610")
+    # May be None if Yahoo Finance is unreachable
+    if detail is not None:
+        assert detail.symbol == "058610"
+        assert detail.market == "KR"
+        assert detail.week52High >= detail.week52Low
+        assert detail.price > 0
 
 
 @pytest.mark.anyio

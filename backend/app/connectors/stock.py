@@ -6,7 +6,7 @@ is not configured.
 """
 
 import httpx
-from app.schemas.market import StockQuote, OHLCData
+from app.schemas.market import StockQuote, StockDetail, OHLCData
 from app.utils.time import utcnow_iso, utcfromtimestamp
 
 # PRD target stocks (FR-003, FR-004)
@@ -81,6 +81,75 @@ async def fetch_foreign_stocks() -> list[StockQuote]:
         if q:
             quotes.append(q)
     return quotes
+
+
+async def fetch_stock_detail(symbol: str) -> StockDetail | None:
+    """Fetch detailed stock information including 52-week high/low."""
+    now = utcnow_iso()
+
+    # Resolve Yahoo Finance symbol
+    yf_symbol = symbol
+    name = symbol
+    market = "US"
+    for yf_sym, display_sym, stock_name in DOMESTIC_STOCKS:
+        if display_sym == symbol:
+            yf_symbol = yf_sym
+            name = stock_name
+            market = "KR"
+            break
+    else:
+        for yf_sym, display_sym, stock_name in FOREIGN_STOCKS:
+            if display_sym == symbol:
+                yf_symbol = yf_sym
+                name = stock_name
+                market = "US"
+                break
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_symbol}",
+                params={"interval": "1d", "range": "1y"},
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
+            if resp.status_code != 200:
+                return None
+
+            result = resp.json()["chart"]["result"][0]
+            meta = result["meta"]
+            price = meta["regularMarketPrice"]
+            prev = meta.get("previousClose", price)
+            change = round(price - prev, 2)
+            pct = round((change / prev) * 100, 2) if prev else 0
+
+            # Calculate 52-week high/low from historical data
+            indicators = result.get("indicators", {})
+            ohlc = indicators.get("quote", [{}])[0]
+            highs = [h for h in ohlc.get("high", []) if h is not None]
+            lows = [lo for lo in ohlc.get("low", []) if lo is not None]
+
+            week52_high = max(highs) if highs else price
+            week52_low = min(lows) if lows else price
+
+            return StockDetail(
+                symbol=symbol,
+                name=name,
+                price=price,
+                change=change,
+                changePercent=pct,
+                volume=int(meta.get("regularMarketVolume", 0)),
+                high=meta.get("regularMarketDayHigh", price),
+                low=meta.get("regularMarketDayLow", price),
+                open=meta.get("regularMarketOpen", price),
+                prevClose=prev,
+                week52High=round(week52_high, 2),
+                week52Low=round(week52_low, 2),
+                marketCap=meta.get("marketCap"),
+                market=market,
+                timestamp=now,
+            )
+    except Exception:
+        return None
 
 
 async def fetch_stock_chart(symbol: str, period: str = "1M") -> list[OHLCData]:

@@ -3,6 +3,7 @@
 import pytest
 from app.schemas.market import (
     StockQuote,
+    StockDetail,
     CryptoQuote,
     PreciousMetalQuote,
     ExchangeRate,
@@ -103,6 +104,30 @@ def test_news_article_schema():
     )
     assert article.id == "news-001"
     assert len(article.relatedSymbols) == 2
+
+
+def test_stock_detail_schema():
+    detail = StockDetail(
+        symbol="058610",
+        name="에스피지",
+        price=35000,
+        change=500,
+        changePercent=1.45,
+        volume=123456,
+        high=35500,
+        low=34500,
+        open=34800,
+        prevClose=34500,
+        week52High=42000,
+        week52Low=28000,
+        marketCap=500000000000,
+        market="KR",
+        timestamp="2026-02-02T09:30:00+00:00",
+    )
+    assert detail.symbol == "058610"
+    assert detail.week52High == 42000
+    assert detail.week52Low == 28000
+    assert detail.week52High >= detail.week52Low
 
 
 def test_ohlc_data_schema():

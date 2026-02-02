@@ -90,6 +90,24 @@ class NewsArticle(BaseModel):
     category: str = "general"
 
 
+class StockDetail(BaseModel):
+    symbol: str
+    name: str
+    price: float
+    change: float
+    changePercent: float
+    volume: int
+    high: float
+    low: float
+    open: float
+    prevClose: float
+    week52High: float
+    week52Low: float
+    marketCap: Optional[float] = None
+    market: str  # "KR" | "US"
+    timestamp: str
+
+
 class OHLCData(BaseModel):
     time: str
     open: float

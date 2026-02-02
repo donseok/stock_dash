@@ -96,6 +96,21 @@ async def test_news(client):
 
 
 @pytest.mark.anyio
+async def test_stock_detail(client):
+    resp = await client.get("/api/v1/stocks/058610/detail")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] in ("success", "error")
+    if data["status"] == "success" and data["data"]:
+        detail = data["data"]
+        assert detail["symbol"] == "058610"
+        assert "week52High" in detail
+        assert "week52Low" in detail
+        assert "price" in detail
+        assert "volume" in detail
+
+
+@pytest.mark.anyio
 async def test_stock_chart(client):
     resp = await client.get("/api/v1/stocks/005930/chart?period=1M")
     assert resp.status_code == 200

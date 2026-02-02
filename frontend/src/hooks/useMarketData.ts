@@ -67,3 +67,12 @@ export function useStockChart(symbol: string, period = "1M") {
     enabled: !!symbol,
   });
 }
+
+export function useStockDetail(symbol: string) {
+  return useQuery({
+    queryKey: ["stock", "detail", symbol],
+    queryFn: () => marketApi.getStockDetail(symbol),
+    select: (res) => res.data,
+    enabled: !!symbol,
+  });
+}
