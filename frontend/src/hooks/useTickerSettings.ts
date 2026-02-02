@@ -17,7 +17,7 @@ const DEFAULT_TICKERS: Record<WidgetCategory, TickerOption[]> = {
   ],
   foreign: [
     { symbol: "GOOG", name: "Alphabet C" },
-    { symbol: "FIGM", name: "Figma" },
+    { symbol: "NVDA", name: "Nvidia" },
   ],
   crypto: [
     { symbol: "BTC", name: "Bitcoin" },

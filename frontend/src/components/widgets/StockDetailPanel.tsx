@@ -13,7 +13,7 @@ const SYMBOLS = [
   { symbol: "247540", name: "에코프로", market: "KR" as const },
   { symbol: "068270", name: "셀트리온", market: "KR" as const },
   { symbol: "GOOG", name: "Alphabet C", market: "US" as const },
-  { symbol: "FIGM", name: "Figma", market: "US" as const },
+  { symbol: "NVDA", name: "Nvidia", market: "US" as const },
 ];
 
 function DetailRow({ label, value }: { label: string; value: string }) {

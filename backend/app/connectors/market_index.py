@@ -76,14 +76,17 @@ async def fetch_market_indices() -> list[MarketIndex]:
                 try:
                     resp = await client.get(
                         f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_symbol}",
-                        params={"interval": "1d", "range": "2d"},
+                        params={"interval": "1d", "range": "5d"},
                         headers={"User-Agent": "Mozilla/5.0"},
                     )
                     if resp.status_code == 200:
                         result = resp.json()["chart"]["result"][0]
                         meta = result["meta"]
                         price = meta["regularMarketPrice"]
-                        prev = meta.get("previousClose", price)
+                        prev = meta.get("previousClose")
+                        if not prev:
+                            closes = [c for c in result.get("indicators", {}).get("quote", [{}])[0].get("close", []) if c is not None]
+                            prev = closes[-2] if len(closes) >= 2 else price
                         change = round(price - prev, 2)
                         pct = round((change / prev) * 100, 2) if prev else 0
 

@@ -18,7 +18,7 @@ DOMESTIC_STOCKS = [
 
 FOREIGN_STOCKS = [
     ("GOOG", "GOOG", "Alphabet C"),
-    ("FIGM", "FIGM", "Figma"),
+    ("NVDA", "NVDA", "Nvidia"),
 ]
 
 
@@ -29,10 +29,10 @@ async def _fetch_yahoo_quote(
     now = utcnow_iso()
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
                 f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
-                params={"interval": "1d", "range": "2d"},
+                params={"interval": "1d", "range": "5d"},
                 headers={"User-Agent": "Mozilla/5.0"},
             )
             if resp.status_code != 200:
@@ -41,7 +41,48 @@ async def _fetch_yahoo_quote(
             result = resp.json()["chart"]["result"][0]
             meta = result["meta"]
             price = meta["regularMarketPrice"]
-            prev = meta.get("previousClose", price)
+
+            # Extract data from chart history for fallback values
+            indicators = result.get("indicators", {})
+            ohlc = indicators.get("quote", [{}])[0]
+            closes = [c for c in ohlc.get("close", []) if c is not None]
+            volumes = [v for v in ohlc.get("volume", []) if v is not None]
+            highs = [h for h in ohlc.get("high", []) if h is not None]
+            lows = [lo for lo in ohlc.get("low", []) if lo is not None]
+            opens = [o for o in ohlc.get("open", []) if o is not None]
+
+            # Get previousClose: prefer meta, fallback to chart close
+            # Detect stock splits: if chart close >> market price, adjust
+            prev = meta.get("previousClose")
+            if not prev and len(closes) >= 2:
+                last_close = closes[-1]
+                ratio = last_close / price if price else 1
+                if ratio > 1.5:
+                    # Likely a stock split; adjust historical close
+                    prev = closes[-2] / ratio
+                else:
+                    prev = closes[-2]
+            elif not prev and len(closes) == 1:
+                prev = closes[0]
+            elif not prev:
+                prev = price
+
+            vol = meta.get("regularMarketVolume")
+            if not vol and volumes:
+                vol = volumes[-1]
+
+            day_high = meta.get("regularMarketDayHigh")
+            if not day_high and highs:
+                day_high = highs[-1]
+
+            day_low = meta.get("regularMarketDayLow")
+            if not day_low and lows:
+                day_low = lows[-1]
+
+            day_open = meta.get("regularMarketOpen")
+            if not day_open and opens:
+                day_open = opens[-1]
+
             change = round(price - prev, 2)
             pct = round((change / prev) * 100, 2) if prev else 0
 
@@ -51,10 +92,10 @@ async def _fetch_yahoo_quote(
                 price=price,
                 change=change,
                 changePercent=pct,
-                volume=int(meta.get("regularMarketVolume", 0)),
-                high=meta.get("regularMarketDayHigh", price),
-                low=meta.get("regularMarketDayLow", price),
-                open=meta.get("regularMarketOpen", price),
+                volume=int(vol or 0),
+                high=day_high or price,
+                low=day_low or price,
+                open=day_open or price,
                 prevClose=prev,
                 timestamp=now,
                 market=market,
@@ -118,18 +159,33 @@ async def fetch_stock_detail(symbol: str) -> StockDetail | None:
             result = resp.json()["chart"]["result"][0]
             meta = result["meta"]
             price = meta["regularMarketPrice"]
-            prev = meta.get("previousClose", price)
+
+            # Extract data from chart history
+            indicators = result.get("indicators", {})
+            ohlc = indicators.get("quote", [{}])[0]
+            closes = [c for c in ohlc.get("close", []) if c is not None]
+            highs = [h for h in ohlc.get("high", []) if h is not None]
+            lows = [lo for lo in ohlc.get("low", []) if lo is not None]
+            opens = [o for o in ohlc.get("open", []) if o is not None]
+            volumes = [v for v in ohlc.get("volume", []) if v is not None]
+
+            prev = meta.get("previousClose")
+            if not prev and len(closes) >= 2:
+                prev = closes[-2]
+            elif not prev and len(closes) == 1:
+                prev = closes[0]
+            elif not prev:
+                prev = price
+
             change = round(price - prev, 2)
             pct = round((change / prev) * 100, 2) if prev else 0
 
-            # Calculate 52-week high/low from historical data
-            indicators = result.get("indicators", {})
-            ohlc = indicators.get("quote", [{}])[0]
-            highs = [h for h in ohlc.get("high", []) if h is not None]
-            lows = [lo for lo in ohlc.get("low", []) if lo is not None]
-
             week52_high = max(highs) if highs else price
             week52_low = min(lows) if lows else price
+
+            vol = meta.get("regularMarketVolume")
+            if not vol and volumes:
+                vol = volumes[-1]
 
             return StockDetail(
                 symbol=symbol,
@@ -137,10 +193,10 @@ async def fetch_stock_detail(symbol: str) -> StockDetail | None:
                 price=price,
                 change=change,
                 changePercent=pct,
-                volume=int(meta.get("regularMarketVolume", 0)),
-                high=meta.get("regularMarketDayHigh", price),
-                low=meta.get("regularMarketDayLow", price),
-                open=meta.get("regularMarketOpen", price),
+                volume=int(vol or 0),
+                high=meta.get("regularMarketDayHigh") or (highs[-1] if highs else price),
+                low=meta.get("regularMarketDayLow") or (lows[-1] if lows else price),
+                open=meta.get("regularMarketOpen") or (opens[-1] if opens else price),
                 prevClose=prev,
                 week52High=round(week52_high, 2),
                 week52Low=round(week52_low, 2),

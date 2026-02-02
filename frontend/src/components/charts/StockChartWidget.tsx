@@ -74,13 +74,21 @@ export function StockChartWidget() {
     });
 
     if (chartData && chartData.length > 0) {
-      const formattedData: CandlestickData<Time>[] = chartData.map((d) => ({
-        time: d.time as Time,
-        open: d.open,
-        high: d.high,
-        low: d.low,
-        close: d.close,
-      }));
+      const seen = new Set<string>();
+      const formattedData: CandlestickData<Time>[] = [];
+      for (const d of chartData) {
+        if (!seen.has(d.time)) {
+          seen.add(d.time);
+          formattedData.push({
+            time: d.time as Time,
+            open: d.open,
+            high: d.high,
+            low: d.low,
+            close: d.close,
+          });
+        }
+      }
+      formattedData.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
       candleSeries.setData(formattedData);
       chart.timeScale().fitContent();
     }
