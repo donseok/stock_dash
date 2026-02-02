@@ -16,10 +16,16 @@ const PERIODS = [
 ];
 
 const DEFAULT_SYMBOLS = [
-  { symbol: "058610", name: "에스피지" },
-  { symbol: "247540", name: "에코프로" },
-  { symbol: "068270", name: "셀트리온" },
+  { symbol: "058610", name: "에스피지", market: "KR" as const },
+  { symbol: "247540", name: "에코프로", market: "KR" as const },
+  { symbol: "068270", name: "셀트리온", market: "KR" as const },
+  { symbol: "GOOG", name: "Alphabet C", market: "US" as const },
+  { symbol: "NVDA", name: "Nvidia", market: "US" as const },
 ];
+
+function toUnixTimestamp(timeStr: string): number {
+  return Math.floor(new Date(timeStr).getTime() / 1000);
+}
 
 export function StockChartWidget() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -31,6 +37,8 @@ export function StockChartWidget() {
     selectedSymbol.symbol,
     period
   );
+
+  const isIntraday = period === "1D" || period === "1W";
 
   const initChart = useCallback(() => {
     if (!chartContainerRef.current) return;
@@ -44,21 +52,22 @@ export function StockChartWidget() {
       height: 400,
       layout: {
         background: { color: "#ffffff" },
-        textColor: "#333",
+        textColor: "#64748b",
       },
       grid: {
-        vertLines: { color: "#f0f0f0" },
-        horzLines: { color: "#f0f0f0" },
+        vertLines: { color: "#f1f5f9" },
+        horzLines: { color: "#f1f5f9" },
       },
       crosshair: {
         mode: 0,
       },
       rightPriceScale: {
-        borderColor: "#e0e0e0",
+        borderColor: "#e2e8f0",
       },
       timeScale: {
-        borderColor: "#e0e0e0",
-        timeVisible: true,
+        borderColor: "#e2e8f0",
+        timeVisible: isIntraday,
+        secondsVisible: false,
       },
     });
 
@@ -77,10 +86,15 @@ export function StockChartWidget() {
       const seen = new Set<string>();
       const formattedData: CandlestickData<Time>[] = [];
       for (const d of chartData) {
-        if (!seen.has(d.time)) {
-          seen.add(d.time);
+        const key = d.time;
+        if (!seen.has(key)) {
+          seen.add(key);
+          // For intraday data (contains "T"), convert to Unix timestamp
+          const timeValue = d.time.includes("T")
+            ? (toUnixTimestamp(d.time) as Time)
+            : (d.time as Time);
           formattedData.push({
-            time: d.time as Time,
+            time: timeValue,
             open: d.open,
             high: d.high,
             low: d.low,
@@ -96,7 +110,7 @@ export function StockChartWidget() {
     return () => {
       chart.remove();
     };
-  }, [chartData]);
+  }, [chartData, isIntraday]);
 
   useEffect(() => {
     initChart();
@@ -116,14 +130,14 @@ export function StockChartWidget() {
   }, []);
 
   const headerRight = (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
       {PERIODS.map((p) => (
         <button
           key={p.value}
           onClick={() => setPeriod(p.value)}
-          className={`px-2 py-1 text-xs rounded ${
+          className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
             period === p.value
-              ? "bg-primary-500 text-white"
+              ? "bg-primary-500 text-white shadow-sm"
               : "text-gray-500 hover:bg-gray-100"
           }`}
         >
@@ -137,15 +151,18 @@ export function StockChartWidget() {
     <Card
       title={`${selectedSymbol.name} (${selectedSymbol.symbol})`}
       headerRight={headerRight}
+      accent="chart"
     >
       <div className="flex gap-2 mb-3">
         {DEFAULT_SYMBOLS.map((s) => (
           <button
             key={s.symbol}
             onClick={() => setSelectedSymbol(s)}
-            className={`px-3 py-1 text-xs rounded-full border ${
+            className={`px-3 py-1 text-xs rounded-full border transition-colors ${
               selectedSymbol.symbol === s.symbol
-                ? "bg-gray-900 text-white border-gray-900"
+                ? s.market === "KR"
+                  ? "bg-emerald-600 text-white border-emerald-600"
+                  : "bg-indigo-600 text-white border-indigo-600"
                 : "text-gray-600 border-gray-200 hover:border-gray-400"
             }`}
           >

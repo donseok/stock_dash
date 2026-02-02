@@ -8,6 +8,7 @@ export function useCryptoQuotes() {
     queryKey: ["crypto", "quotes"],
     queryFn: marketApi.getCryptoQuotes,
     select: (res) => res.data,
+    refetchInterval: 30_000,
   });
 }
 
@@ -16,6 +17,7 @@ export function usePreciousMetals() {
     queryKey: ["metals", "quotes"],
     queryFn: marketApi.getPreciousMetals,
     select: (res) => res.data,
+    refetchInterval: 60_000,
   });
 }
 
@@ -24,6 +26,7 @@ export function useExchangeRates() {
     queryKey: ["exchange", "rates"],
     queryFn: marketApi.getExchangeRates,
     select: (res) => res.data,
+    refetchInterval: 60_000,
   });
 }
 
@@ -32,6 +35,7 @@ export function useMarketIndices() {
     queryKey: ["indices", "quotes"],
     queryFn: marketApi.getMarketIndices,
     select: (res) => res.data,
+    refetchInterval: 30_000,
   });
 }
 
@@ -40,6 +44,7 @@ export function useDomesticStocks() {
     queryKey: ["stocks", "domestic"],
     queryFn: marketApi.getDomesticStocks,
     select: (res) => res.data,
+    refetchInterval: 30_000,
   });
 }
 
@@ -48,6 +53,7 @@ export function useForeignStocks() {
     queryKey: ["stocks", "foreign"],
     queryFn: marketApi.getForeignStocks,
     select: (res) => res.data,
+    refetchInterval: 30_000,
   });
 }
 
@@ -56,6 +62,7 @@ export function useNews(limit = 20) {
     queryKey: ["news", limit],
     queryFn: () => marketApi.getNews(limit),
     select: (res) => res.data,
+    refetchInterval: 60_000,
   });
 }
 
@@ -74,5 +81,6 @@ export function useStockDetail(symbol: string) {
     queryFn: () => marketApi.getStockDetail(symbol),
     select: (res) => res.data,
     enabled: !!symbol,
+    refetchInterval: 30_000,
   });
 }

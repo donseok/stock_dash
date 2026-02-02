@@ -42,6 +42,17 @@ export function formatVolume(value: number): string {
 
 export function formatDateTime(isoString: string): string {
   const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHour = Math.floor(diffMs / 3600000);
+  const diffDay = Math.floor(diffMs / 86400000);
+
+  if (diffMin < 1) return "방금 전";
+  if (diffMin < 60) return `${diffMin}분 전`;
+  if (diffHour < 24) return `${diffHour}시간 전`;
+  if (diffDay < 7) return `${diffDay}일 전`;
+
   return new Intl.DateTimeFormat("ko-KR", {
     month: "2-digit",
     day: "2-digit",
@@ -60,4 +71,10 @@ export function getChangeBgColor(change: number): string {
   if (change > 0) return "bg-red-50";
   if (change < 0) return "bg-blue-50";
   return "bg-gray-50";
+}
+
+export function getChangeBadgeClass(change: number): string {
+  if (change > 0) return "change-badge-up";
+  if (change < 0) return "change-badge-down";
+  return "change-badge-neutral";
 }

@@ -31,6 +31,23 @@ const config: Config = {
           DEFAULT: "#f8fafc",
           dark: "#0f172a",
         },
+        accent: {
+          gold: "#f59e0b",
+          silver: "#94a3b8",
+          crypto: "#8b5cf6",
+          forex: "#06b6d4",
+          domestic: "#10b981",
+          foreign: "#6366f1",
+        },
+      },
+      animation: {
+        "pulse-live": "pulse-live 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+      },
+      keyframes: {
+        "pulse-live": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.4" },
+        },
       },
     },
   },

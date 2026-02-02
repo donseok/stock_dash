@@ -9,7 +9,7 @@
 }
 
 body {
-  @apply bg-gray-50 text-gray-900 antialiased;
+  @apply bg-slate-50 text-gray-900 antialiased;
 }
 
 /* Price change animations */
@@ -29,6 +29,19 @@ body {
 
 .price-down {
   animation: flash-down 0.5s ease-out;
+}
+
+/* Change badges */
+.change-badge-up {
+  @apply inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600;
+}
+
+.change-badge-down {
+  @apply inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600;
+}
+
+.change-badge-neutral {
+  @apply inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500;
 }
 
 /* Scrollbar styles */

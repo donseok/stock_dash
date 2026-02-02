@@ -208,8 +208,60 @@ async def fetch_stock_detail(symbol: str) -> StockDetail | None:
         return None
 
 
+async def _fetch_chart_raw(
+    yf_symbol: str, interval: str, yf_range: str
+) -> list[OHLCData]:
+    """Fetch raw OHLC data from Yahoo Finance for a given interval/range."""
+    is_intraday = interval in ("1m", "2m", "5m", "15m", "30m", "60m", "90m")
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_symbol}",
+            params={"interval": interval, "range": yf_range},
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        resp.raise_for_status()
+        result = resp.json()["chart"]["result"][0]
+
+        timestamps = result.get("timestamp", [])
+        indicators = result.get("indicators", {})
+        ohlc = indicators.get("quote", [{}])[0]
+
+        chart_data = []
+        for i, ts in enumerate(timestamps):
+            o = ohlc.get("open", [None])[i]
+            h = ohlc.get("high", [None])[i]
+            l_ = ohlc.get("low", [None])[i]
+            c = ohlc.get("close", [None])[i]
+            v = ohlc.get("volume", [None])[i]
+
+            if all(x is not None for x in [o, h, l_, c]):
+                dt = utcfromtimestamp(ts)
+                time_str = (
+                    dt.strftime("%Y-%m-%dT%H:%M")
+                    if is_intraday
+                    else dt.strftime("%Y-%m-%d")
+                )
+                chart_data.append(
+                    OHLCData(
+                        time=time_str,
+                        open=round(o, 2),
+                        high=round(h, 2),
+                        low=round(l_, 2),
+                        close=round(c, 2),
+                        volume=v,
+                    )
+                )
+        return chart_data
+
+
 async def fetch_stock_chart(symbol: str, period: str = "1M") -> list[OHLCData]:
-    """Fetch OHLC chart data for a given stock symbol."""
+    """Fetch OHLC chart data for a given stock symbol.
+
+    For short periods (1D, 1W), tries intraday intervals first. If no data is
+    returned (e.g. weekend/holiday or Yahoo doesn't provide intraday for the
+    market), falls back to daily candles over a wider range.
+    """
     period_map = {
         "1D": ("5m", "1d"),
         "1W": ("30m", "5d"),
@@ -217,6 +269,12 @@ async def fetch_stock_chart(symbol: str, period: str = "1M") -> list[OHLCData]:
         "3M": ("1d", "3mo"),
         "1Y": ("1wk", "1y"),
     }
+    # Fallback configs: try a wider range, then daily interval
+    fallback_map = {
+        "1D": [("5m", "5d"), ("1d", "5d")],
+        "1W": [("30m", "10d"), ("1d", "1mo")],
+    }
+
     interval, yf_range = period_map.get(period, ("1d", "1mo"))
 
     # Map KR symbol to Yahoo Finance symbol
@@ -225,41 +283,25 @@ async def fetch_stock_chart(symbol: str, period: str = "1M") -> list[OHLCData]:
         if display_sym == symbol:
             yf_symbol = yf_sym
             break
+    else:
+        for yf_sym, display_sym, _ in FOREIGN_STOCKS:
+            if display_sym == symbol:
+                yf_symbol = yf_sym
+                break
 
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(
-                f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_symbol}",
-                params={"interval": interval, "range": yf_range},
-                headers={"User-Agent": "Mozilla/5.0"},
+    # Build list of attempts: primary + fallbacks
+    attempts = [(interval, yf_range)]
+    if period in fallback_map:
+        attempts.extend(fallback_map[period])
+
+    for attempt_interval, attempt_range in attempts:
+        try:
+            chart_data = await _fetch_chart_raw(
+                yf_symbol, attempt_interval, attempt_range
             )
-            resp.raise_for_status()
-            result = resp.json()["chart"]["result"][0]
+            if chart_data:
+                return chart_data
+        except Exception:
+            continue
 
-            timestamps = result.get("timestamp", [])
-            indicators = result.get("indicators", {})
-            ohlc = indicators.get("quote", [{}])[0]
-
-            chart_data = []
-            for i, ts in enumerate(timestamps):
-                o = ohlc.get("open", [None])[i]
-                h = ohlc.get("high", [None])[i]
-                l_ = ohlc.get("low", [None])[i]
-                c = ohlc.get("close", [None])[i]
-                v = ohlc.get("volume", [None])[i]
-
-                if all(x is not None for x in [o, h, l_, c]):
-                    dt = utcfromtimestamp(ts)
-                    chart_data.append(
-                        OHLCData(
-                            time=dt.strftime("%Y-%m-%d"),
-                            open=round(o, 2),
-                            high=round(h, 2),
-                            low=round(l_, 2),
-                            close=round(c, 2),
-                            volume=v,
-                        )
-                    )
-            return chart_data
-    except Exception:
-        return []
+    return []
