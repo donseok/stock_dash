@@ -4,6 +4,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1.router import api_router
+
 app = FastAPI(
     title="Stock Dashboard API",
     description="주식 웹 포털 대시보드 API - 국내외 주식, 암호화폐, 금/은, 환율, 뉴스 통합 제공",
@@ -30,6 +32,5 @@ async def health_check():
     return {"status": "healthy"}
 
 
-# API 라우터 등록 (추후 구현)
-# from app.api.v1.router import api_router
-# app.include_router(api_router, prefix="/api/v1")
+# API v1 라우터 등록
+app.include_router(api_router, prefix="/api/v1")
