@@ -10,6 +10,16 @@ import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { TickerSettingsModal } from "@/components/common/TickerSettingsModal";
 import { formatPrice, formatVolume } from "@/utils/format";
 
+const CRYPTO_ICONS: Record<string, string> = {
+  BTC: "https://assets.coingecko.com/coins/images/1/small/bitcoin.png",
+  ETH: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
+  SOL: "https://assets.coingecko.com/coins/images/4128/small/solana.png",
+  XRP: "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png",
+  LINK: "https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png",
+  SUI: "https://assets.coingecko.com/coins/images/26375/small/sui-ocean-square.png",
+  ONDO: "https://assets.coingecko.com/coins/images/26580/small/ONDO.png",
+};
+
 export function CryptoWidget() {
   const { data: quotes, isLoading, error, refetch } = useCryptoQuotes();
   const { enabledSymbols } = useTickerSettings("crypto");
@@ -36,7 +46,7 @@ export function CryptoWidget() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-gray-400 border-b border-gray-200">
+                <tr className="text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-slate-700">
                   <th className="text-left py-2 font-medium">종목</th>
                   <th className="text-right py-2 font-medium">현재가</th>
                   <th className="text-right py-2 font-medium">등락률</th>
@@ -47,13 +57,25 @@ export function CryptoWidget() {
                 {filtered.map((q, i) => (
                   <tr
                     key={q.symbol}
-                    className={`border-b border-gray-50 hover:bg-slate-50 transition-colors ${
-                      i % 2 === 1 ? "bg-slate-50/50" : ""
-                    }`}
+                    className={`border-b border-gray-50 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${i % 2 === 1 ? "bg-slate-50/50 dark:bg-slate-800/50" : ""
+                      }`}
                   >
                     <td className="py-2.5">
-                      <div className="font-medium text-gray-900">{q.symbol}</div>
-                      <div className="text-xs text-gray-400">{q.name}</div>
+                      <div className="flex items-center gap-2">
+                        {CRYPTO_ICONS[q.symbol] && (
+                          <img
+                            src={CRYPTO_ICONS[q.symbol]}
+                            alt={q.symbol}
+                            width={20}
+                            height={20}
+                            className="rounded-full"
+                          />
+                        )}
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-gray-100">{q.symbol}</div>
+                          <div className="text-xs text-gray-400 dark:text-gray-500">{q.name}</div>
+                        </div>
+                      </div>
                     </td>
                     <td className="text-right font-mono">
                       {formatPrice(q.price, q.currency)}
@@ -61,7 +83,7 @@ export function CryptoWidget() {
                     <td className="text-right">
                       <PriceChange change={q.change} changePercent={q.changePercent} badge />
                     </td>
-                    <td className="text-right text-gray-500 hidden sm:table-cell">
+                    <td className="text-right text-gray-500 dark:text-gray-400 hidden sm:table-cell">
                       {formatVolume(q.volume24h)}
                     </td>
                   </tr>

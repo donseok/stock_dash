@@ -28,18 +28,18 @@ export function ExchangeRateWidget() {
           {rates.map((r) => (
             <div
               key={`${r.baseCurrency}/${r.quoteCurrency}`}
-              className="flex items-center justify-between p-2.5 rounded-lg bg-gradient-to-r from-cyan-50/50 to-slate-50 border border-cyan-100/50"
+              className="flex items-center justify-between p-2.5 rounded-lg bg-gradient-to-r from-cyan-50/50 to-slate-50 dark:from-cyan-900/20 dark:to-slate-800 border border-cyan-100/50 dark:border-cyan-900/30"
             >
               <div className="flex items-center gap-2">
                 <span className="text-base font-mono text-cyan-600">
                   {currencyFlags[r.baseCurrency] || r.baseCurrency}
                 </span>
-                <span className="text-sm font-medium text-gray-900">
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   {r.baseCurrency}/{r.quoteCurrency}
                 </span>
               </div>
               <div className="text-right">
-                <div className="text-sm font-mono font-semibold text-gray-900">
+                <div className="text-sm font-mono font-semibold text-gray-900 dark:text-gray-100">
                   {formatNumber(r.rate, 2)}
                 </div>
                 <PriceChange

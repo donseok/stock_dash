@@ -30,9 +30,9 @@ export function NewsWidget() {
               href={article.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="block p-2.5 rounded-lg hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200"
+              className="block p-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-600"
             >
-              <div className="text-sm font-medium text-gray-900 line-clamp-2 leading-snug">
+              <div className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2 leading-snug">
                 {article.title}
               </div>
               <div className="flex items-center gap-2 mt-1.5">
@@ -41,9 +41,9 @@ export function NewsWidget() {
                     {article.category}
                   </span>
                 )}
-                <span className="text-[11px] text-gray-500 font-medium">{article.source}</span>
-                <span className="text-[11px] text-gray-300">|</span>
-                <span className="text-[11px] text-gray-400">
+                <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">{article.source}</span>
+                <span className="text-[11px] text-gray-300 dark:text-gray-600">|</span>
+                <span className="text-[11px] text-gray-400 dark:text-gray-500">
                   {formatDateTime(article.publishedAt)}
                 </span>
               </div>

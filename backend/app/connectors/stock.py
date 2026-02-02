@@ -5,13 +5,20 @@ Uses Yahoo Finance as a free data source fallback when KIS OpenAPI
 is not configured.
 """
 
+import asyncio
+import logging
+
 import httpx
+from app.core.cache import cache
+from app.core.config import settings
 from app.schemas.market import StockQuote, StockDetail, OHLCData
 from app.utils.time import utcnow_iso, utcfromtimestamp
 
+logger = logging.getLogger(__name__)
+
 # PRD target stocks (FR-003, FR-004)
 DOMESTIC_STOCKS = [
-    ("058610.KS", "058610", "에스피지"),
+    ("058610.KQ", "058610", "에스피지"),  # KOSDAQ 종목
     ("247540.KQ", "247540", "에코프로"),
     ("068270.KS", "068270", "셀트리온"),
 ]
@@ -19,6 +26,8 @@ DOMESTIC_STOCKS = [
 FOREIGN_STOCKS = [
     ("GOOG", "GOOG", "Alphabet C"),
     ("NVDA", "NVDA", "Nvidia"),
+    ("BMNR", "BMNR", "Bitmine Immersion"),
+    ("FIG", "FIG", "Figma"),
 ]
 
 
@@ -100,32 +109,50 @@ async def _fetch_yahoo_quote(
                 timestamp=now,
                 market=market,
             )
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to fetch quote for %s: %s", symbol, e)
         return None
 
 
 async def fetch_domestic_stocks() -> list[StockQuote]:
     """Fetch domestic (Korean) stock quotes."""
-    quotes = []
-    for yf_sym, display_sym, name in DOMESTIC_STOCKS:
-        q = await _fetch_yahoo_quote(yf_sym, display_sym, name, "KR")
-        if q:
-            quotes.append(q)
+    cached = cache.get("domestic_stocks")
+    if cached is not None:
+        return cached
+
+    tasks = [
+        _fetch_yahoo_quote(yf_sym, display_sym, name, "KR")
+        for yf_sym, display_sym, name in DOMESTIC_STOCKS
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    quotes = [r for r in results if isinstance(r, StockQuote)]
+    cache.set("domestic_stocks", quotes, settings.CACHE_TTL_STOCK)
     return quotes
 
 
 async def fetch_foreign_stocks() -> list[StockQuote]:
     """Fetch foreign stock quotes."""
-    quotes = []
-    for yf_sym, display_sym, name in FOREIGN_STOCKS:
-        q = await _fetch_yahoo_quote(yf_sym, display_sym, name, "US")
-        if q:
-            quotes.append(q)
+    cached = cache.get("foreign_stocks")
+    if cached is not None:
+        return cached
+
+    tasks = [
+        _fetch_yahoo_quote(yf_sym, display_sym, name, "US")
+        for yf_sym, display_sym, name in FOREIGN_STOCKS
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    quotes = [r for r in results if isinstance(r, StockQuote)]
+    cache.set("foreign_stocks", quotes, settings.CACHE_TTL_STOCK)
     return quotes
 
 
 async def fetch_stock_detail(symbol: str) -> StockDetail | None:
     """Fetch detailed stock information including 52-week high/low."""
+    cache_key = f"stock_detail:{symbol}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     now = utcnow_iso()
 
     # Resolve Yahoo Finance symbol
@@ -187,7 +214,7 @@ async def fetch_stock_detail(symbol: str) -> StockDetail | None:
             if not vol and volumes:
                 vol = volumes[-1]
 
-            return StockDetail(
+            detail = StockDetail(
                 symbol=symbol,
                 name=name,
                 price=price,
@@ -204,7 +231,10 @@ async def fetch_stock_detail(symbol: str) -> StockDetail | None:
                 market=market,
                 timestamp=now,
             )
-    except Exception:
+            cache.set(cache_key, detail, settings.CACHE_TTL_STOCK)
+            return detail
+    except Exception as e:
+        logger.warning("Failed to fetch stock detail for %s: %s", symbol, e)
         return None
 
 
@@ -227,13 +257,21 @@ async def _fetch_chart_raw(
         indicators = result.get("indicators", {})
         ohlc = indicators.get("quote", [{}])[0]
 
+        open_list = ohlc.get("open", [])
+        high_list = ohlc.get("high", [])
+        low_list = ohlc.get("low", [])
+        close_list = ohlc.get("close", [])
+        vol_list = ohlc.get("volume", [])
+
         chart_data = []
         for i, ts in enumerate(timestamps):
-            o = ohlc.get("open", [None])[i]
-            h = ohlc.get("high", [None])[i]
-            l_ = ohlc.get("low", [None])[i]
-            c = ohlc.get("close", [None])[i]
-            v = ohlc.get("volume", [None])[i]
+            if i >= len(close_list):
+                break
+            o = open_list[i] if i < len(open_list) else None
+            h = high_list[i] if i < len(high_list) else None
+            l_ = low_list[i] if i < len(low_list) else None
+            c = close_list[i] if i < len(close_list) else None
+            v = vol_list[i] if i < len(vol_list) else None
 
             if all(x is not None for x in [o, h, l_, c]):
                 dt = utcfromtimestamp(ts)
@@ -262,6 +300,11 @@ async def fetch_stock_chart(symbol: str, period: str = "1M") -> list[OHLCData]:
     returned (e.g. weekend/holiday or Yahoo doesn't provide intraday for the
     market), falls back to daily candles over a wider range.
     """
+    cache_key = f"stock_chart:{symbol}:{period}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     period_map = {
         "1D": ("5m", "1d"),
         "1W": ("30m", "5d"),
@@ -300,8 +343,10 @@ async def fetch_stock_chart(symbol: str, period: str = "1M") -> list[OHLCData]:
                 yf_symbol, attempt_interval, attempt_range
             )
             if chart_data:
+                cache.set(cache_key, chart_data, settings.CACHE_TTL_STOCK)
                 return chart_data
-        except Exception:
+        except Exception as e:
+            logger.warning("Chart fetch failed for %s (%s/%s): %s", yf_symbol, attempt_interval, attempt_range, e)
             continue
 
     return []

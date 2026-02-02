@@ -5,12 +5,17 @@ when API key is not configured. Uses mock data only if RSS also fails.
 """
 
 import hashlib
+import logging
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
+
 import httpx
+from app.core.cache import cache
 from app.core.config import settings
 from app.schemas.market import NewsArticle
 from app.utils.time import utcnow_iso
+
+logger = logging.getLogger(__name__)
 
 MOCK_NEWS = [
     NewsArticle(
@@ -110,8 +115,8 @@ async def _fetch_google_news_rss(limit: int = 20) -> list[NewsArticle]:
             try:
                 dt = parsedate_to_datetime(pub_date_str)
                 published_at = dt.isoformat()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to parse RSS date '%s': %s", pub_date_str, e)
 
         article_id = hashlib.md5(
             (link + title).encode()
@@ -138,6 +143,12 @@ async def _fetch_google_news_rss(limit: int = 20) -> list[NewsArticle]:
 
 async def fetch_news(limit: int = 20) -> list[NewsArticle]:
     """Fetch financial news articles."""
+    cache_key = f"news:{limit}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    result = None
 
     # 1. Try NewsAPI if key is configured
     if settings.NEWS_API_KEY:
@@ -174,17 +185,22 @@ async def fetch_news(limit: int = 20) -> list[NewsArticle]:
                         category="business",
                     )
                 )
-            return articles[:limit]
-        except Exception:
-            pass  # Fall through to RSS
+            result = articles[:limit]
+        except Exception as e:
+            logger.warning("NewsAPI fetch failed: %s", e)
 
     # 2. Try Google News RSS (no API key needed)
-    try:
-        rss_articles = await _fetch_google_news_rss(limit)
-        if rss_articles:
-            return rss_articles
-    except Exception:
-        pass  # Fall through to mock
+    if result is None:
+        try:
+            rss_articles = await _fetch_google_news_rss(limit)
+            if rss_articles:
+                result = rss_articles
+        except Exception as e:
+            logger.warning("Google News RSS fetch failed: %s", e)
 
     # 3. Final fallback: mock data
-    return MOCK_NEWS[:limit]
+    if result is None:
+        result = MOCK_NEWS[:limit]
+
+    cache.set(cache_key, result, settings.CACHE_TTL_NEWS)
+    return result

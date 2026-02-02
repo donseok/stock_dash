@@ -1,8 +1,14 @@
 """Upbit API connector for cryptocurrency data."""
 
+import logging
+
 import httpx
+from app.core.cache import cache
+from app.core.config import settings
 from app.schemas.market import CryptoQuote
 from app.utils.time import utcnow_iso
+
+logger = logging.getLogger(__name__)
 
 UPBIT_API = "https://api.upbit.com/v1"
 
@@ -20,6 +26,10 @@ CRYPTO_MARKETS = [
 
 async def fetch_crypto_quotes() -> list[CryptoQuote]:
     """Fetch real-time crypto quotes from Upbit API."""
+    cached = cache.get("crypto_quotes")
+    if cached is not None:
+        return cached
+
     markets = ",".join(m[0] for m in CRYPTO_MARKETS)
     market_map = {m[0]: (m[1], m[2]) for m in CRYPTO_MARKETS}
 
@@ -52,4 +62,5 @@ async def fetch_crypto_quotes() -> list[CryptoQuote]:
                 currency="KRW",
             )
         )
+    cache.set("crypto_quotes", quotes, settings.CACHE_TTL_CRYPTO)
     return quotes
