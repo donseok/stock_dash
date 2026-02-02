@@ -16,8 +16,8 @@ const PERIODS = [
 ];
 
 const DEFAULT_SYMBOLS = [
-  { symbol: "005930", name: "삼성전자" },
-  { symbol: "373220", name: "LG에너지솔루션" },
+  { symbol: "058610", name: "에스피지" },
+  { symbol: "247540", name: "에코프로" },
   { symbol: "068270", name: "셀트리온" },
 ];
 

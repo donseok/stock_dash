@@ -9,15 +9,16 @@ import httpx
 from app.schemas.market import StockQuote, OHLCData
 from app.utils.time import utcnow_iso, utcfromtimestamp
 
-# PRD target stocks
+# PRD target stocks (FR-003, FR-004)
 DOMESTIC_STOCKS = [
-    ("005930.KS", "005930", "삼성전자"),
-    ("247540.KS", "247540", "에코프로비엠"),
+    ("058610.KS", "058610", "에스피지"),
+    ("247540.KQ", "247540", "에코프로"),
     ("068270.KS", "068270", "셀트리온"),
 ]
 
 FOREIGN_STOCKS = [
-    ("GOOGL", "GOOGL", "Alphabet C"),
+    ("GOOG", "GOOG", "Alphabet C"),
+    ("FIGM", "FIGM", "Figma"),
 ]
 
 
