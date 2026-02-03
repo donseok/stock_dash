@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForeignStocks } from "@/hooks/useMarketData";
+import { useForeignStocks, useExchangeRates } from "@/hooks/useMarketData";
 import { useTickerSettings } from "@/hooks/useTickerSettings";
 import { Card } from "@/components/common/Card";
 import { PriceChange } from "@/components/common/PriceChange";
@@ -11,11 +11,17 @@ import { TickerSettingsModal } from "@/components/common/TickerSettingsModal";
 import { formatPrice, formatVolume } from "@/utils/format";
 
 export function ForeignStockWidget() {
-  const { data: stocks, isLoading, error, refetch } = useForeignStocks();
-  const { enabledSymbols } = useTickerSettings("foreign");
+  const { enabledSymbols, extraParams } = useTickerSettings("foreign");
+  const { data: stocks, isLoading, error, refetch } = useForeignStocks(extraParams);
+  const { data: exchangeRates } = useExchangeRates();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const filtered = stocks?.filter((s) => enabledSymbols.includes(s.symbol));
+
+  // Get USD/KRW rate for conversion
+  const usdKrwRate = exchangeRates?.find(
+    (r) => r.baseCurrency === "USD" && r.quoteCurrency === "KRW"
+  )?.rate || 1450;
 
   const settingsButton = (
     <button
@@ -36,7 +42,7 @@ export function ForeignStockWidget() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-gray-400 border-b border-gray-200">
+                <tr className="text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-slate-700">
                   <th className="text-left py-2 font-medium">종목</th>
                   <th className="text-right py-2 font-medium">현재가</th>
                   <th className="text-right py-2 font-medium">등락률</th>
@@ -44,28 +50,34 @@ export function ForeignStockWidget() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((s, i) => (
-                  <tr
-                    key={s.symbol}
-                    className={`border-b border-gray-50 hover:bg-slate-50 transition-colors ${
-                      i % 2 === 1 ? "bg-slate-50/50" : ""
-                    }`}
-                  >
-                    <td className="py-2.5">
-                      <div className="font-medium text-gray-900">{s.name}</div>
-                      <div className="text-xs text-gray-400">{s.symbol}</div>
-                    </td>
-                    <td className="text-right font-mono">
-                      {formatPrice(s.price, "USD")}
-                    </td>
-                    <td className="text-right">
-                      <PriceChange change={s.change} changePercent={s.changePercent} badge />
-                    </td>
-                    <td className="text-right text-gray-500 hidden sm:table-cell">
-                      {formatVolume(s.volume)}
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map((s, i) => {
+                  const krwPrice = s.price * usdKrwRate;
+                  return (
+                    <tr
+                      key={s.symbol}
+                      className={`border-b border-gray-50 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${
+                        i % 2 === 1 ? "bg-slate-50/50 dark:bg-slate-800/50" : ""
+                      }`}
+                    >
+                      <td className="py-2.5">
+                        <div className="font-medium text-gray-900 dark:text-gray-100">{s.name}</div>
+                        <div className="text-xs text-gray-400 dark:text-gray-500">{s.symbol}</div>
+                      </td>
+                      <td className="text-right font-mono">
+                        <div>{formatPrice(s.price, "USD")}</div>
+                        <div className="text-xs text-gray-400 dark:text-gray-500">
+                          {formatPrice(krwPrice, "KRW")}
+                        </div>
+                      </td>
+                      <td className="text-right">
+                        <PriceChange change={s.change} changePercent={s.changePercent} badge />
+                      </td>
+                      <td className="text-right text-gray-500 dark:text-gray-400 hidden sm:table-cell">
+                        {formatVolume(s.volume)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {filtered.length === 0 && (

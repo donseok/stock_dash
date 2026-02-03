@@ -39,19 +39,19 @@ export function useMarketIndices() {
   });
 }
 
-export function useDomesticStocks() {
+export function useDomesticStocks(extra?: string[]) {
   return useQuery({
-    queryKey: ["stocks", "domestic"],
-    queryFn: marketApi.getDomesticStocks,
+    queryKey: ["stocks", "domestic", extra],
+    queryFn: () => marketApi.getDomesticStocks(extra),
     select: (res) => res.data,
     refetchInterval: 30_000,
   });
 }
 
-export function useForeignStocks() {
+export function useForeignStocks(extra?: string[]) {
   return useQuery({
-    queryKey: ["stocks", "foreign"],
-    queryFn: marketApi.getForeignStocks,
+    queryKey: ["stocks", "foreign", extra],
+    queryFn: () => marketApi.getForeignStocks(extra),
     select: (res) => res.data,
     refetchInterval: 30_000,
   });
@@ -66,21 +66,31 @@ export function useNews(limit = 20) {
   });
 }
 
-export function useStockChart(symbol: string, period = "1M") {
+export function useStockChart(symbol: string, period = "1M", yf?: string) {
   return useQuery({
-    queryKey: ["chart", symbol, period],
-    queryFn: () => marketApi.getStockChart(symbol, period),
+    queryKey: ["chart", symbol, period, yf],
+    queryFn: () => marketApi.getStockChart(symbol, period, yf),
     select: (res) => res.data,
     enabled: !!symbol,
   });
 }
 
-export function useStockDetail(symbol: string) {
+export function useStockDetail(symbol: string, yf?: string) {
   return useQuery({
-    queryKey: ["stock", "detail", symbol],
-    queryFn: () => marketApi.getStockDetail(symbol),
+    queryKey: ["stock", "detail", symbol, yf],
+    queryFn: () => marketApi.getStockDetail(symbol, yf),
     select: (res) => res.data,
     enabled: !!symbol,
     refetchInterval: 30_000,
+  });
+}
+
+export function useStockSearch(query: string, enabled = true) {
+  return useQuery({
+    queryKey: ["stock", "search", query],
+    queryFn: () => marketApi.searchStocks(query),
+    select: (res) => res.data,
+    enabled: enabled && query.length > 0,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

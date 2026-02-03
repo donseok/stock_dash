@@ -11,8 +11,8 @@ import { TickerSettingsModal } from "@/components/common/TickerSettingsModal";
 import { formatPrice, formatVolume } from "@/utils/format";
 
 export function DomesticStockWidget() {
-  const { data: stocks, isLoading, error, refetch } = useDomesticStocks();
-  const { enabledSymbols } = useTickerSettings("domestic");
+  const { enabledSymbols, extraParams } = useTickerSettings("domestic");
+  const { data: stocks, isLoading, error, refetch } = useDomesticStocks(extraParams);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const filtered = stocks?.filter((s) => enabledSymbols.includes(s.symbol));

@@ -115,3 +115,11 @@ class OHLCData(BaseModel):
     low: float
     close: float
     volume: Optional[float] = None
+
+
+class StockSearchResult(BaseModel):
+    symbol: str         # Display symbol (068270, AAPL)
+    yahooSymbol: str    # Yahoo Finance symbol (068270.KS, AAPL)
+    name: str
+    market: str         # "KR" | "US"
+    exchange: str       # "KSE", "KOE", "NMS" etc.

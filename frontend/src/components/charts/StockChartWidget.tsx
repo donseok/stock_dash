@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createChart, IChartApi, CandlestickData, Time } from "lightweight-charts";
 import { useStockChart } from "@/hooks/useMarketData";
+import { useTickerSettings } from "@/hooks/useTickerSettings";
 import { Card } from "@/components/common/Card";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
@@ -15,13 +16,12 @@ const PERIODS = [
   { label: "1년", value: "1Y" },
 ];
 
-const DEFAULT_SYMBOLS = [
-  { symbol: "058610", name: "에스피지", market: "KR" as const },
-  { symbol: "247540", name: "에코프로", market: "KR" as const },
-  { symbol: "068270", name: "셀트리온", market: "KR" as const },
-  { symbol: "GOOG", name: "Alphabet C", market: "US" as const },
-  { symbol: "NVDA", name: "Nvidia", market: "US" as const },
-];
+interface SymbolOption {
+  symbol: string;
+  yahooSymbol?: string;
+  name: string;
+  market: "KR" | "US";
+}
 
 function toUnixTimestamp(timeStr: string): number {
   return Math.floor(new Date(timeStr).getTime() / 1000);
@@ -30,12 +30,50 @@ function toUnixTimestamp(timeStr: string): number {
 export function StockChartWidget() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const [selectedSymbol, setSelectedSymbol] = useState(DEFAULT_SYMBOLS[0]);
+
+  const domesticSettings = useTickerSettings("domestic");
+  const foreignSettings = useTickerSettings("foreign");
+
+  // Build combined list of enabled symbols from both domestic and foreign
+  const symbols: SymbolOption[] = useMemo(() => {
+    const domesticSymbols = domesticSettings.allTickers
+      .filter((t) => domesticSettings.enabledSymbols.includes(t.symbol))
+      .map((t) => ({
+        symbol: t.symbol,
+        yahooSymbol: t.yahooSymbol,
+        name: t.name,
+        market: "KR" as const,
+      }));
+
+    const foreignSymbols = foreignSettings.allTickers
+      .filter((t) => foreignSettings.enabledSymbols.includes(t.symbol))
+      .map((t) => ({
+        symbol: t.symbol,
+        yahooSymbol: t.yahooSymbol,
+        name: t.name,
+        market: "US" as const,
+      }));
+
+    return [...domesticSymbols, ...foreignSymbols];
+  }, [
+    domesticSettings.allTickers,
+    domesticSettings.enabledSymbols,
+    foreignSettings.allTickers,
+    foreignSettings.enabledSymbols,
+  ]);
+
+  const [selectedSymbol, setSelectedSymbol] = useState<SymbolOption | null>(null);
   const [period, setPeriod] = useState("1M");
 
+  // Auto-select first symbol when list changes
+  const effectiveSelected = selectedSymbol && symbols.some((s) => s.symbol === selectedSymbol.symbol)
+    ? selectedSymbol
+    : symbols[0] || null;
+
   const { data: chartData, isLoading, error, refetch } = useStockChart(
-    selectedSymbol.symbol,
-    period
+    effectiveSelected?.symbol || "",
+    period,
+    effectiveSelected?.yahooSymbol
   );
 
   const isIntraday = period === "1D" || period === "1W";
@@ -147,19 +185,29 @@ export function StockChartWidget() {
     </div>
   );
 
+  if (symbols.length === 0) {
+    return (
+      <Card title="주식 차트" accent="chart">
+        <p className="text-xs text-gray-400 text-center py-4">
+          표시할 종목이 없습니다. 국내/해외 주식 위젯에서 종목을 추가하세요.
+        </p>
+      </Card>
+    );
+  }
+
   return (
     <Card
-      title={`${selectedSymbol.name} (${selectedSymbol.symbol})`}
+      title={effectiveSelected ? `${effectiveSelected.name} (${effectiveSelected.symbol})` : "주식 차트"}
       headerRight={headerRight}
       accent="chart"
     >
       <div className="flex gap-2 mb-3">
-        {DEFAULT_SYMBOLS.map((s) => (
+        {symbols.map((s) => (
           <button
             key={s.symbol}
             onClick={() => setSelectedSymbol(s)}
             className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-              selectedSymbol.symbol === s.symbol
+              effectiveSelected?.symbol === s.symbol
                 ? s.market === "KR"
                   ? "bg-emerald-600 text-white border-emerald-600"
                   : "bg-indigo-600 text-white border-indigo-600"

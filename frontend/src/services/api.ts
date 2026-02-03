@@ -39,28 +39,46 @@ export const marketApi = {
       "/api/v1/indices/quotes"
     ),
 
-  getDomesticStocks: () =>
-    fetchApi<{ data: import("@/types/market").StockQuote[] }>(
-      "/api/v1/stocks/domestic"
-    ),
+  getDomesticStocks: (extra?: string[]) => {
+    const params = extra?.length
+      ? "?" + extra.map((e) => `extra=${encodeURIComponent(e)}`).join("&")
+      : "";
+    return fetchApi<{ data: import("@/types/market").StockQuote[] }>(
+      `/api/v1/stocks/domestic${params}`
+    );
+  },
 
-  getForeignStocks: () =>
-    fetchApi<{ data: import("@/types/market").StockQuote[] }>(
-      "/api/v1/stocks/foreign"
-    ),
+  getForeignStocks: (extra?: string[]) => {
+    const params = extra?.length
+      ? "?" + extra.map((e) => `extra=${encodeURIComponent(e)}`).join("&")
+      : "";
+    return fetchApi<{ data: import("@/types/market").StockQuote[] }>(
+      `/api/v1/stocks/foreign${params}`
+    );
+  },
 
   getNews: (limit = 20) =>
     fetchApi<{ data: import("@/types/market").NewsArticle[] }>(
       `/api/v1/news?limit=${limit}`
     ),
 
-  getStockChart: (symbol: string, period = "1M") =>
-    fetchApi<{ data: import("@/types/market").OHLCData[] }>(
-      `/api/v1/stocks/${symbol}/chart?period=${period}`
-    ),
+  getStockChart: (symbol: string, period = "1M", yf?: string) => {
+    const params = new URLSearchParams({ period });
+    if (yf) params.set("yf", yf);
+    return fetchApi<{ data: import("@/types/market").OHLCData[] }>(
+      `/api/v1/stocks/${symbol}/chart?${params}`
+    );
+  },
 
-  getStockDetail: (symbol: string) =>
-    fetchApi<{ data: import("@/types/market").StockDetail }>(
-      `/api/v1/stocks/${symbol}/detail`
+  getStockDetail: (symbol: string, yf?: string) => {
+    const params = yf ? `?yf=${encodeURIComponent(yf)}` : "";
+    return fetchApi<{ data: import("@/types/market").StockDetail }>(
+      `/api/v1/stocks/${symbol}/detail${params}`
+    );
+  },
+
+  searchStocks: (q: string, limit = 10) =>
+    fetchApi<{ data: import("@/types/market").StockSearchResult[] }>(
+      `/api/v1/stocks/search?q=${encodeURIComponent(q)}&limit=${limit}`
     ),
 };

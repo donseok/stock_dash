@@ -1,20 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useStockDetail } from "@/hooks/useMarketData";
+import { useTickerSettings } from "@/hooks/useTickerSettings";
 import { Card } from "@/components/common/Card";
 import { PriceChange } from "@/components/common/PriceChange";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { formatPrice, formatVolume } from "@/utils/format";
 
-const SYMBOLS = [
-  { symbol: "058610", name: "에스피지", market: "KR" as const },
-  { symbol: "247540", name: "에코프로", market: "KR" as const },
-  { symbol: "068270", name: "셀트리온", market: "KR" as const },
-  { symbol: "GOOG", name: "Alphabet C", market: "US" as const },
-  { symbol: "NVDA", name: "Nvidia", market: "US" as const },
-];
+interface SymbolOption {
+  symbol: string;
+  yahooSymbol?: string;
+  name: string;
+  market: "KR" | "US";
+}
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -50,18 +50,69 @@ function Week52Bar({ current, low, high }: { current: number; low: number; high:
 }
 
 export function StockDetailPanel() {
-  const [selected, setSelected] = useState(SYMBOLS[0]);
-  const { data: detail, isLoading, error, refetch } = useStockDetail(selected.symbol);
-  const currency = selected.market === "KR" ? "KRW" : "USD";
+  const domesticSettings = useTickerSettings("domestic");
+  const foreignSettings = useTickerSettings("foreign");
+
+  // Build combined list of enabled symbols from both domestic and foreign
+  const symbols: SymbolOption[] = useMemo(() => {
+    const domesticSymbols = domesticSettings.allTickers
+      .filter((t) => domesticSettings.enabledSymbols.includes(t.symbol))
+      .map((t) => ({
+        symbol: t.symbol,
+        yahooSymbol: t.yahooSymbol,
+        name: t.name,
+        market: "KR" as const,
+      }));
+
+    const foreignSymbols = foreignSettings.allTickers
+      .filter((t) => foreignSettings.enabledSymbols.includes(t.symbol))
+      .map((t) => ({
+        symbol: t.symbol,
+        yahooSymbol: t.yahooSymbol,
+        name: t.name,
+        market: "US" as const,
+      }));
+
+    return [...domesticSymbols, ...foreignSymbols];
+  }, [
+    domesticSettings.allTickers,
+    domesticSettings.enabledSymbols,
+    foreignSettings.allTickers,
+    foreignSettings.enabledSymbols,
+  ]);
+
+  const [selected, setSelected] = useState<SymbolOption | null>(null);
+
+  // Auto-select first symbol when list changes
+  const effectiveSelected = selected && symbols.some((s) => s.symbol === selected.symbol)
+    ? selected
+    : symbols[0] || null;
+
+  const { data: detail, isLoading, error, refetch } = useStockDetail(
+    effectiveSelected?.symbol || "",
+    effectiveSelected?.yahooSymbol
+  );
+
+  const currency = effectiveSelected?.market === "KR" ? "KRW" : "USD";
+
+  if (symbols.length === 0) {
+    return (
+      <Card title="종목 상세정보" accent="chart">
+        <p className="text-xs text-gray-400 text-center py-4">
+          표시할 종목이 없습니다. 국내/해외 주식 위젯에서 종목을 추가하세요.
+        </p>
+      </Card>
+    );
+  }
 
   return (
     <Card title="종목 상세정보" accent="chart">
       <div className="flex flex-wrap gap-1.5 mb-3">
-        {SYMBOLS.map((s) => (
+        {symbols.map((s) => (
           <button
             key={s.symbol}
             onClick={() => setSelected(s)}
-            className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${selected.symbol === s.symbol
+            className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${effectiveSelected?.symbol === s.symbol
                 ? s.market === "KR"
                   ? "bg-emerald-600 text-white border-emerald-600"
                   : "bg-indigo-600 text-white border-indigo-600"

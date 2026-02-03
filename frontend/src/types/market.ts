@@ -97,6 +97,22 @@ export interface OHLCData {
   volume?: number;
 }
 
+export interface StockSearchResult {
+  symbol: string;
+  yahooSymbol: string;
+  name: string;
+  market: "KR" | "US";
+  exchange: string;
+}
+
+export interface CustomTicker {
+  symbol: string;
+  yahooSymbol: string;
+  name: string;
+  market: "KR" | "US";
+  isDefault: false;
+}
+
 export type WidgetType =
   | "stock-chart"
   | "crypto-price"

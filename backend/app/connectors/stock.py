@@ -11,7 +11,7 @@ import logging
 import httpx
 from app.core.cache import cache
 from app.core.config import settings
-from app.schemas.market import StockQuote, StockDetail, OHLCData
+from app.schemas.market import StockQuote, StockDetail, OHLCData, StockSearchResult
 from app.utils.time import utcnow_iso, utcfromtimestamp
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,58 @@ FOREIGN_STOCKS = [
     ("BMNR", "BMNR", "Bitmine Immersion"),
     ("FIG", "FIG", "Figma"),
 ]
+
+CACHE_TTL_SEARCH = 300  # 5 minutes
+
+
+async def search_stocks(query: str, limit: int = 10) -> list[StockSearchResult]:
+    """Search stocks via Yahoo Finance search API."""
+    cache_key = f"stock_search:{query}:{limit}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://query1.finance.yahoo.com/v1/finance/search",
+                params={"q": query, "quotesCount": limit, "newsCount": 0},
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
+            if resp.status_code != 200:
+                return []
+
+            data = resp.json()
+            quotes = data.get("quotes", [])
+            results = []
+            for q in quotes:
+                qtype = q.get("quoteType", "")
+                if qtype not in ("EQUITY", "ETF"):
+                    continue
+                yf_symbol = q.get("symbol", "")
+                exchange = q.get("exchange", "")
+                name = q.get("shortname") or q.get("longname") or yf_symbol
+
+                # Determine market and display symbol
+                if yf_symbol.endswith(".KS") or yf_symbol.endswith(".KQ"):
+                    market = "KR"
+                    display_symbol = yf_symbol.rsplit(".", 1)[0]
+                else:
+                    market = "US"
+                    display_symbol = yf_symbol
+
+                results.append(StockSearchResult(
+                    symbol=display_symbol,
+                    yahooSymbol=yf_symbol,
+                    name=name,
+                    market=market,
+                    exchange=exchange,
+                ))
+            cache.set(cache_key, results, CACHE_TTL_SEARCH)
+            return results
+    except Exception as e:
+        logger.warning("Failed to search stocks for %s: %s", query, e)
+        return []
 
 
 async def _fetch_yahoo_quote(
@@ -114,40 +166,74 @@ async def _fetch_yahoo_quote(
         return None
 
 
-async def fetch_domestic_stocks() -> list[StockQuote]:
-    """Fetch domestic (Korean) stock quotes."""
-    cached = cache.get("domestic_stocks")
+async def fetch_domestic_stocks(
+    extra_stocks: list[tuple[str, str, str]] | None = None,
+) -> list[StockQuote]:
+    """Fetch domestic (Korean) stock quotes.
+
+    extra_stocks: list of (yahooSymbol, displaySymbol, name) tuples for
+    user-added custom tickers.
+    """
+    all_stocks = list(DOMESTIC_STOCKS)
+    if extra_stocks:
+        existing = {s[0] for s in all_stocks}
+        for s in extra_stocks:
+            if s[0] not in existing:
+                all_stocks.append(s)
+
+    cache_key = "domestic_stocks:" + ",".join(s[0] for s in all_stocks)
+    cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
     tasks = [
         _fetch_yahoo_quote(yf_sym, display_sym, name, "KR")
-        for yf_sym, display_sym, name in DOMESTIC_STOCKS
+        for yf_sym, display_sym, name in all_stocks
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     quotes = [r for r in results if isinstance(r, StockQuote)]
-    cache.set("domestic_stocks", quotes, settings.CACHE_TTL_STOCK)
+    cache.set(cache_key, quotes, settings.CACHE_TTL_STOCK)
     return quotes
 
 
-async def fetch_foreign_stocks() -> list[StockQuote]:
-    """Fetch foreign stock quotes."""
-    cached = cache.get("foreign_stocks")
+async def fetch_foreign_stocks(
+    extra_stocks: list[tuple[str, str, str]] | None = None,
+) -> list[StockQuote]:
+    """Fetch foreign stock quotes.
+
+    extra_stocks: list of (yahooSymbol, displaySymbol, name) tuples for
+    user-added custom tickers.
+    """
+    all_stocks = list(FOREIGN_STOCKS)
+    if extra_stocks:
+        existing = {s[0] for s in all_stocks}
+        for s in extra_stocks:
+            if s[0] not in existing:
+                all_stocks.append(s)
+
+    cache_key = "foreign_stocks:" + ",".join(s[0] for s in all_stocks)
+    cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
     tasks = [
         _fetch_yahoo_quote(yf_sym, display_sym, name, "US")
-        for yf_sym, display_sym, name in FOREIGN_STOCKS
+        for yf_sym, display_sym, name in all_stocks
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     quotes = [r for r in results if isinstance(r, StockQuote)]
-    cache.set("foreign_stocks", quotes, settings.CACHE_TTL_STOCK)
+    cache.set(cache_key, quotes, settings.CACHE_TTL_STOCK)
     return quotes
 
 
-async def fetch_stock_detail(symbol: str) -> StockDetail | None:
-    """Fetch detailed stock information including 52-week high/low."""
+async def fetch_stock_detail(
+    symbol: str, yahoo_symbol: str | None = None
+) -> StockDetail | None:
+    """Fetch detailed stock information including 52-week high/low.
+
+    yahoo_symbol: optional Yahoo Finance symbol hint for custom tickers
+    not in the hardcoded lists.
+    """
     cache_key = f"stock_detail:{symbol}"
     cached = cache.get(cache_key)
     if cached is not None:
@@ -156,9 +242,9 @@ async def fetch_stock_detail(symbol: str) -> StockDetail | None:
     now = utcnow_iso()
 
     # Resolve Yahoo Finance symbol
-    yf_symbol = symbol
+    yf_symbol = yahoo_symbol or symbol
     name = symbol
-    market = "US"
+    market = "KR" if (yf_symbol.endswith(".KS") or yf_symbol.endswith(".KQ")) else "US"
     for yf_sym, display_sym, stock_name in DOMESTIC_STOCKS:
         if display_sym == symbol:
             yf_symbol = yf_sym
@@ -293,12 +379,16 @@ async def _fetch_chart_raw(
         return chart_data
 
 
-async def fetch_stock_chart(symbol: str, period: str = "1M") -> list[OHLCData]:
+async def fetch_stock_chart(
+    symbol: str, period: str = "1M", yahoo_symbol: str | None = None
+) -> list[OHLCData]:
     """Fetch OHLC chart data for a given stock symbol.
 
     For short periods (1D, 1W), tries intraday intervals first. If no data is
     returned (e.g. weekend/holiday or Yahoo doesn't provide intraday for the
     market), falls back to daily candles over a wider range.
+
+    yahoo_symbol: optional Yahoo Finance symbol hint for custom tickers.
     """
     cache_key = f"stock_chart:{symbol}:{period}"
     cached = cache.get(cache_key)
@@ -321,7 +411,7 @@ async def fetch_stock_chart(symbol: str, period: str = "1M") -> list[OHLCData]:
     interval, yf_range = period_map.get(period, ("1d", "1mo"))
 
     # Map KR symbol to Yahoo Finance symbol
-    yf_symbol = symbol
+    yf_symbol = yahoo_symbol or symbol
     for yf_sym, display_sym, _ in DOMESTIC_STOCKS:
         if display_sym == symbol:
             yf_symbol = yf_sym

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useCryptoQuotes } from "@/hooks/useMarketData";
+import { useCryptoQuotes, useExchangeRates } from "@/hooks/useMarketData";
 import { useTickerSettings } from "@/hooks/useTickerSettings";
 import { Card } from "@/components/common/Card";
 import { PriceChange } from "@/components/common/PriceChange";
@@ -22,10 +22,16 @@ const CRYPTO_ICONS: Record<string, string> = {
 
 export function CryptoWidget() {
   const { data: quotes, isLoading, error, refetch } = useCryptoQuotes();
+  const { data: exchangeRates } = useExchangeRates();
   const { enabledSymbols } = useTickerSettings("crypto");
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const filtered = quotes?.filter((q) => enabledSymbols.includes(q.symbol));
+
+  // Get USD/KRW rate for conversion
+  const usdKrwRate = exchangeRates?.find(
+    (r) => r.baseCurrency === "USD" && r.quoteCurrency === "KRW"
+  )?.rate || 1450;
 
   const settingsButton = (
     <button
@@ -54,40 +60,46 @@ export function CryptoWidget() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((q, i) => (
-                  <tr
-                    key={q.symbol}
-                    className={`border-b border-gray-50 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${i % 2 === 1 ? "bg-slate-50/50 dark:bg-slate-800/50" : ""
-                      }`}
-                  >
-                    <td className="py-2.5">
-                      <div className="flex items-center gap-2">
-                        {CRYPTO_ICONS[q.symbol] && (
-                          <img
-                            src={CRYPTO_ICONS[q.symbol]}
-                            alt={q.symbol}
-                            width={20}
-                            height={20}
-                            className="rounded-full"
-                          />
-                        )}
-                        <div>
-                          <div className="font-medium text-gray-900 dark:text-gray-100">{q.symbol}</div>
-                          <div className="text-xs text-gray-400 dark:text-gray-500">{q.name}</div>
+                {filtered.map((q, i) => {
+                  const usdPrice = q.price / usdKrwRate;
+                  return (
+                    <tr
+                      key={q.symbol}
+                      className={`border-b border-gray-50 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${i % 2 === 1 ? "bg-slate-50/50 dark:bg-slate-800/50" : ""
+                        }`}
+                    >
+                      <td className="py-2.5">
+                        <div className="flex items-center gap-2">
+                          {CRYPTO_ICONS[q.symbol] && (
+                            <img
+                              src={CRYPTO_ICONS[q.symbol]}
+                              alt={q.symbol}
+                              width={20}
+                              height={20}
+                              className="rounded-full"
+                            />
+                          )}
+                          <div>
+                            <div className="font-medium text-gray-900 dark:text-gray-100">{q.symbol}</div>
+                            <div className="text-xs text-gray-400 dark:text-gray-500">{q.name}</div>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="text-right font-mono">
-                      {formatPrice(q.price, q.currency)}
-                    </td>
-                    <td className="text-right">
-                      <PriceChange change={q.change} changePercent={q.changePercent} badge />
-                    </td>
-                    <td className="text-right text-gray-500 dark:text-gray-400 hidden sm:table-cell">
-                      {formatVolume(q.volume24h)}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="text-right font-mono">
+                        <div>{formatPrice(q.price, "KRW")}</div>
+                        <div className="text-xs text-gray-400 dark:text-gray-500">
+                          {formatPrice(usdPrice, "USD")}
+                        </div>
+                      </td>
+                      <td className="text-right">
+                        <PriceChange change={q.change} changePercent={q.changePercent} badge />
+                      </td>
+                      <td className="text-right text-gray-500 dark:text-gray-400 hidden sm:table-cell">
+                        {formatVolume(q.volume24h)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {filtered.length === 0 && (
